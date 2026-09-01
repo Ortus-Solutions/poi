@@ -1,0 +1,56 @@
+name: Publish POI JAR to S3
+
+on:
+  push:
+    branches: [ poi-s3-publish ]
+  workflow_call:
+    secrets:
+      AWS_ACCESS_KEY:
+        required: true
+      AWS_ACCESS_SECRET:
+        required: true
+
+permissions: {}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: 'gradle'
+
+    - name: Build POI JAR
+      run: ./gradlew :poi:jar -PjdkVersion=17 --no-daemon
+
+    - name: Prepare S3 upload
+      shell: bash
+      run: |
+        jar_path="build/dist/maven/poi/poi-*.jar"
+        jar_file=$(find build/dist/maven/poi -maxdepth 1 -type f -name 'poi-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -n 1)
+        if [ -z "$jar_file" ]; then
+          echo "POI JAR not found at $jar_path" >&2
+          exit 1
+        fi
+        folder_name=$(basename "$jar_file" .jar | sed 's/^poi-//')
+        mkdir -p build/dist/maven/poi/temp
+        cp "$jar_file" build/dist/maven/poi/temp/
+        echo "folderName=$folder_name" >> "$GITHUB_ENV"
+
+    - name: Upload JAR to S3
+      uses: jakejarvis/s3-sync-action@master
+      with:
+        args: --acl public-read
+      env:
+        AWS_S3_BUCKET: "downloads.ortussolutions.com"
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_ACCESS_SECRET }}
+        SOURCE_DIR: "build/dist/maven/poi/temp/"
+        DEST_DIR: "apache/poi/${{env.folderName}}"
