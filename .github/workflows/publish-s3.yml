@@ -27,21 +27,21 @@ jobs:
         distribution: 'temurin'
         cache: 'gradle'
 
-    - name: Build POI JAR
-      run: ./gradlew :poi:jar -PjdkVersion=17 --no-daemon
+    - name: Build POI OOXML JAR
+      run: ./gradlew :poi-ooxml:jar -PjdkVersion=17 --no-daemon
 
     - name: Prepare S3 upload
       shell: bash
       run: |
-        jar_path="build/dist/maven/poi/poi-*.jar"
-        jar_file=$(find build/dist/maven/poi -maxdepth 1 -type f -name 'poi-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -n 1)
+        jar_path="build/dist/maven/poi-ooxml/poi-ooxml-*.jar"
+        jar_file=$(find build/dist/maven/poi-ooxml -maxdepth 1 -type f -name 'poi-ooxml-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -n 1)
         if [ -z "$jar_file" ]; then
           echo "POI JAR not found at $jar_path" >&2
           exit 1
         fi
-        folder_name=$(basename "$jar_file" .jar | sed 's/^poi-//')
-        mkdir -p build/dist/maven/poi/temp
-        cp "$jar_file" build/dist/maven/poi/temp/
+        folder_name=$(basename "$jar_file" .jar | sed 's/^poi-ooxml-//')
+        mkdir -p build/dist/maven/poi-ooxml/temp
+        cp "$jar_file" build/dist/maven/poi-ooxml/temp/
         echo "folderName=$folder_name" >> "$GITHUB_ENV"
 
     - name: Upload JAR to S3
@@ -52,5 +52,5 @@ jobs:
         AWS_S3_BUCKET: "downloads.ortussolutions.com"
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_ACCESS_SECRET }}
-        SOURCE_DIR: "build/dist/maven/poi/temp/"
+        SOURCE_DIR: "build/dist/maven/poi-ooxml/temp/"
         DEST_DIR: "apache/poi/${{env.folderName}}"
